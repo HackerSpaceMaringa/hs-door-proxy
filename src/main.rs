@@ -1,5 +1,6 @@
 use rocket::form::{Form, FromForm};
 use rocket::fs::{relative, FileServer};
+use rocket::response::Redirect;
 use rocket::{launch, post, routes};
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ struct SignInForm {
 }
 
 #[post("/sign-in", data = "<form>")]
-async fn sign_in(form: Form<SignInForm>) -> &'static str {
+async fn sign_in(form: Form<SignInForm>) -> Redirect {
     let SignInForm { user, pass } = form.into_inner();
     let data = format!("{}{}", pass, user.repeat(10));
     let digest = Sha512::digest(data.as_bytes());
@@ -27,7 +28,7 @@ async fn sign_in(form: Form<SignInForm>) -> &'static str {
     let client = reqwest::Client::new();
     client.post(URL).form(&params).send().await;
 
-    "Se a senha estiver correta, você ouvirá um som e a porta abrirá"
+    Redirect::to("/result.html")
 }
 
 #[launch]
