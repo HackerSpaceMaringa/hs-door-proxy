@@ -6,20 +6,29 @@
     <meta name="author" content="Hackerspace Maringá">
     <meta name="description" content="Página de acesso">
     <title>Acesso - Hackerspace Maringá</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <form method="POST" action="/sign-in">
-      <label>
-        Usuário:
-        <input type="text" name="user" tabIndex="1" />
-      </label>
+    <form class="form" method="POST" action="/sign-in">
+      <h1 class="title">
+        <span>HACKERSPACE</span>
+        <span>MARINGÁ</span>
+      </h1>
 
-      <label>
-        Senha:
-        <input type="password" name="pass" tabIndex="2" />
+      <label class="label" for="user">
+        USUÁRIO:
       </label>
+      <input id="user" type="text" name="user" tabIndex="1" />
 
-      <input type="submit" value="Enviar" tabIndex="3" />
+      <label class="label" for="pass">
+        SENHA:
+      </label>
+      <input id="pass" type="password" name="pass" tabIndex="2" />
+
+      <input class="button" type="submit" value="ENVIAR" tabIndex="3" />
     </form>
   </body>
 </html>
