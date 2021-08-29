@@ -51,6 +51,25 @@ html, body {
 	color: #03DAC5;
 }
 
+.form .info {
+	font-size: 1.5rem;
+	text-align: center;
+}
+
+.form .return {
+	text-align: center;
+	padding: 1rem;
+	margin-top: 2rem;
+	border-radius: 1rem;
+	background: #03DAC5;
+	color: #00000080;
+	font-family: 'Montserrat', sans-serif;
+	font-size: 1rem;
+	font-weight: bold;
+	outline: none;
+	text-decoration: none;
+}
+
 .form .button {
 	border: none;
 	padding: 1rem;
