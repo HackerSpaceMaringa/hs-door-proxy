@@ -1,0 +1,64 @@
+html, body {
+	width: 100vw;
+	height: 100vh;
+	padding: 0;
+	margin: 0;
+	background: #121212;
+	color: #03DAC5;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.form {
+	margin: 4rem 2rem;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	background: #FFFFFF20;
+	padding: 2rem;
+	border-radius: 1rem;
+}
+
+.form .title {
+	margin: 0;
+	margin-bottom: 2rem;
+}
+
+.form .title span {
+	display: block;
+	font-family: 'Space Mono', monospace;
+	text-align: center;
+}
+
+.form .label {
+	margin-top: 1rem;
+	font-family: 'Montserrat', sans-serif;
+	display: block;
+	color: white;
+	font-size: 0.8rem;
+	font-weight: bold;
+}
+
+.form input {
+	font-family: 'Montserrat', sans-serif;
+	margin-top: 0.5rem;
+	font-size: 1rem;
+	border: white solid 2px;
+	padding: 1rem;
+	background: transparent;
+	border-radius: 0.5rem;
+	color: #03DAC5;
+}
+
+.form .button {
+	border: none;
+	padding: 1rem;
+	margin-top: 2rem;
+	border-radius: 1rem;
+	background: #03DAC5;
+	color: #00000080;
+	font-family: 'Montserrat', sans-serif;
+	font-size: 1rem;
+	font-weight: bold;
+}
