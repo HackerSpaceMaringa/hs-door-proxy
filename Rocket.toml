@@ -1,2 +1,5 @@
 [global]
 address = "0.0.0.0"
+
+[global.databases]
+sqlite_teste = { url = "/path/to/database.sqlite" }

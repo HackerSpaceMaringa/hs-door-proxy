@@ -1,24 +1,35 @@
-use argon2::password_hash::rand_core::OsRng;
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use rocket::fairing::AdHoc;
-use rocket::form::{Form, FromForm};
-use rocket::fs::{relative, FileServer};
-use rocket::response::Redirect;
-use rocket::{launch, post, routes};
-use rocket::{Build, Rocket};
+#![feature(once_cell)]
+
+use anyhow::Result;
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+};
+use rocket::{
+    fairing::AdHoc,
+    form::{Form, FromForm},
+    fs::{relative, FileServer},
+    launch, post,
+    response::{status::BadRequest, Redirect},
+    routes, Build, Rocket,
+};
 use rocket_sync_db_pools::{database, rusqlite};
 use sha2::{Digest, Sha512};
-use std::collections::HashMap;
+use std::{collections::HashMap, lazy::SyncLazy};
 use totp_lite::totp_custom;
 
-const GLOBAL_USER: &str = env!("HS_USER", "missing HS_USER env variable");
-const GLOBAL_PASS: &str = env!("HS_PASS", "missing HS_PASS env variable");
-const URL: &str = env!("HS_URL", "missing HS_URL env variable");
-const OTP: &str = env!("HS_OTP", "missing HS_OTP env variable");
-const DB: &str = env!("HS_DB", "missing HS_DB env variable");
+const GLOBAL_USER: SyncLazy<String> =
+    SyncLazy::new(|| std::env::var("HS_USER").expect("missing HS_USER env variable"));
+const GLOBAL_PASS: SyncLazy<String> =
+    SyncLazy::new(|| std::env::var("HS_PASS").expect("missing HS_PASS env variable"));
+const URL: SyncLazy<String> =
+    SyncLazy::new(|| std::env::var("HS_URL").expect("missing HS_URL env variable"));
+const OTP: SyncLazy<String> =
+    SyncLazy::new(|| std::env::var("HS_OTP").expect("missing HS_OTP env variable"));
+const DB: SyncLazy<String> =
+    SyncLazy::new(|| std::env::var("HS_DB").expect("missing HS_DB env variable"));
 
-#[database("rusqlite")]
+#[database("sqlite_teste")]
 struct Database(rusqlite::Connection);
 
 #[derive(FromForm)]
@@ -35,8 +46,15 @@ struct SignUpForm {
 }
 
 #[post("/sign-up", data = "<form>")]
-async fn sign_up(form: Form<SignUpForm>, db: Database) -> Redirect {
+async fn sign_up(
+    form: Form<SignUpForm>,
+    db: Database,
+) -> Result<Redirect, BadRequest<&'static str>> {
     let SignUpForm { user, pass, token } = form.into_inner();
+
+    if pass.len() > 128 {
+        return Err(BadRequest(Some("Invalid password")));
+    }
 
     let seconds: u64 = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -45,11 +63,7 @@ async fn sign_up(form: Form<SignUpForm>, db: Database) -> Redirect {
     let current: String = totp_custom::<Sha512>(300, 16, OTP.as_bytes(), seconds);
 
     if current == token {
-        panic!("Invalid token");
-    }
-
-    if pass.len() > 128 {
-        panic!("Invalid password");
+        return Err(BadRequest(Some("Invalid token")));
     }
 
     let argon2 = Argon2::default();
@@ -59,19 +73,20 @@ async fn sign_up(form: Form<SignUpForm>, db: Database) -> Redirect {
         .expect("Failed to hash password")
         .to_string();
 
-    db.run(move |conn| {
-        conn.execute(
+    db.run(|c| {
+        c.execute(
             "INSERT INTO person (user, data) VALUES (?1, ?2)",
-            rusqlite::params![user, hash],
+            [user, hash],
         )
-        .expect("Failed to save user")
-    });
+    })
+    .await
+    .unwrap();
 
-    Redirect::to("/index.html")
+    Ok(Redirect::to("/index.html"))
 }
 
 fn global_user() -> HashMap<String, String> {
-    let data = format!("{}{}", GLOBAL_PASS, GLOBAL_USER.repeat(10));
+    let data = format!("{}{}", &*GLOBAL_PASS, GLOBAL_USER.repeat(10));
     let digest = Sha512::digest(data.as_bytes());
     let pass = hex::encode(digest);
 
@@ -82,43 +97,30 @@ fn global_user() -> HashMap<String, String> {
     params
 }
 
+fn search_person_by_user(conn: &rusqlite::Connection, user: &String) -> String {
+    conn.query_row_and_then("SELECT pass FROM person WHERE user = ?1", [user], |row| {
+        row.get(0)
+    })
+    .unwrap()
+}
+
 #[post("/sign-in", data = "<form>")]
 async fn sign_in(form: Form<SignInForm>, db: Database) -> Redirect {
     let SignInForm { user, pass } = form.into_inner();
 
-    let hash = db
-        .run(|conn| {
-            let mut stmt = conn
-                .prepare("SELECT pass FROM person WHERE user = ?1")
-                .expect("Failed to construct query");
-            let mut rows = stmt
-                .query(rusqlite::params![user])
-                .expect("Failed to execute query");
-            let hash = rows.next().expect("Failed to extract row");
-            hash
-        })
-        .await;
-
-    if let None = hash {
-        panic!("Invalid user/pass combination");
-    }
-
-    let hash = hash.unwrap();
-    let hash: String = hash.get(0).expect("Failed to get pass");
+    let hash = db.run(move |c| search_person_by_user(c, &user)).await;
 
     let argon2 = Argon2::default();
     let hash = PasswordHash::new(&hash).expect("Failed to construct password hash");
     if argon2.verify_password(pass.as_bytes(), &hash).is_err() {
         panic!("Invalid user/pass combination");
+    } else {
+        let params = global_user();
+        let client = reqwest::Client::new();
+        client.post(&*URL).form(&params).send().await;
+
+        Redirect::to("/result.html")
     }
-
-    // Add Log
-
-    let params = global_user();
-    let client = reqwest::Client::new();
-    client.post(URL).form(&params).send().await;
-
-    Redirect::to("/result.html")
 }
 
 async fn init_db(rocket: Rocket<Build>) -> Rocket<Build> {
@@ -127,12 +129,12 @@ async fn init_db(rocket: Rocket<Build>) -> Rocket<Build> {
         .expect("Unable to mount database")
         .run(|conn| {
             conn.execute(
-                "CREATE TABLE person (
+                "CREATE TABLE person IF NOT EXISTS (
                     id   INTEGER PRIMARY KEY,
                     user TEXT NOT NULL,
                     pass TEXT NOT NULL
                 )",
-                rusqlite::params![],
+                [],
             )
         })
         .await
